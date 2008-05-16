@@ -1,0 +1,13 @@
+.project
+AutoXS.h
+benchmark/get_set.t
+Build.PL
+lib/Class/Std/Fast_XS.pm
+lib/Class/Std/Fast_XS.xs
+MANIFEST			This list of files
+META.yml
+README
+t/00-use.t
+t/096_characters.t
+t/098_pod.t
+t/099_pod_coverage.t
