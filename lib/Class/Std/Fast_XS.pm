@@ -3,32 +3,34 @@ package Class::Std::Fast_XS;
 use strict;
 use warnings;
 
-our $VESION = 0.1;
+our $VESION = 0.2;
 
 use base qw(DynaLoader);
 
 BEGIN {
-    bootstrap Class::Std::Fast_XS 0.1;
+    bootstrap Class::Std::Fast_XS 0.2;
 
     require Class::Std::Fast;
 
     my $attributes_of_ref = {};
 
-    Class::Std::Fast_XS::init($attributes_of_ref);
+    Class::Std::Fast_XS::init($attributes_of_ref, Class::Std::Fast::_attribute_ref());
 
     no warnings qw(redefine);
 
     *Class::Std::Fast::__create_getter = sub {
-        # my ($package, $referent, $getter, $name) = @_;
-        $attributes_of_ref->{ "$_[0]::$_[3]" } ||= $_[1];
+        # my ($package, $referent, $name) = @_;
+        $attributes_of_ref->{ "$_[0]::$_[2]" } ||= $_[1];
         newxs_getter("$_[0]::get_$_[2]", "$_[0]::$_[2]")
     };
 
     *Class::Std::Fast::__create_setter = sub {
-        # my ($package, $referent, $setter, $name) = @_;
-        $attributes_of_ref->{ "$_[0]::$_[3]" } ||= $_[1];
+        # my ($package, $referent, $name) = @_;
+        $attributes_of_ref->{ "$_[0]::$_[2]" } ||= $_[1];
         newxs_setter("$_[0]::set_$_[2]", "$_[0]::$_[2]")
     };
+
+    *Class::Std::Fast::DESTROY = \&Class::Std::Fast_XS::destroy;
 }
 
 1;
@@ -43,18 +45,18 @@ Class::Std::Fast_XS - speed up Class::Std::Fast by adding some XS code
 
 =head1 SYNOPSIS
 
- require Class::Std::Fast_XS
+ use Class::Std::Fast_XS
 
 =head1 DESCRIPTION
 
-Speeds up Class::Std::Fast by replacing it's accessors/mutators by XS
-variants.
+Speeds up Class::Std::Fast by replacing it's accessors/mutators and DESTROY
+method by XS variants.
 
 The speed gain varies by platform:
 
 Using perl 5.8.8 on Ubuntu 8.04 (32bit) Linux, the measured speed gain
 is around 7.5% for accessors (getters) and around 35% for mutators
-(setters).
+(setters). DESTROY was around 220% faster on this platform.
 
 On a RHEL 5.0 box (64bit) with perl-5.8.8 the speed gain is around
 40% for getters and around 60% for setters.
@@ -71,13 +73,30 @@ All you have to do is to require this module before you load/create
 Class::Std::Fast- based classes. More precisely, all Class::Std::Fast-based
 attributes (:ATTR) after loading Class::Std::Fast_XS will be affected.
 
+If you're running a mod_perl environment, you should probably load
+C<Class::Std::Fast_XS> from your apache config or your startup.pl.
+
 =head1 BUGS AND LIMITATIONS
+
+=over
+
+=item * Loading
 
 Only attributes detected after loading are affected.
 
+Only classes created after loading are affected by DESTROY
+
+=item * No object cache
+
+Class::Std::Fast's DESTROY does not support Class::Std::Fast's object cache
+yet. This does not mean that classing using the object_cache facility don't
+work, it just means that the object_cache has no effect yet.
+
+=back
+
 =head1 ACKNOWLEDGEMENTS
 
-Based on L<Class::XSAccessor|Class::XSAccessor> and L<AutoXS> by Steffen Müller.
+Based on L<Class::XSAccessor|Class::XSAccessor> and L<AutoXS> by Steffen ME<uuml>ller.
 
 =head1 LICENSE AND COPYRIGHT
 

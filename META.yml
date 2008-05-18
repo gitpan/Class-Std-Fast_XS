@@ -1,6 +1,6 @@
 ---
 name: Class-Std-Fast_XS
-version: 0.1
+version: 0.2
 author:
   - 'Martin Kuter - MKUTTER@cpan.org'
 abstract: speed up Class::Std::Fast by adding some XS code

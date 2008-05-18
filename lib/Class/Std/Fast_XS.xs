@@ -13,15 +13,166 @@
 #include "AutoXS.h"
 
 HV * global_hash_ref;
+HV * global_hierarchy_of;
+HV * global_attribute_of;
 
-void init(SV* data_hash_ref) {
+autoxs_hashkey global_ref_key;
+
+char * get_class(SV* obj) {
+    char * class_name;
+    HV * class_stash = SvSTASH(SvRV(obj));
+    if ((class_stash == NULL) || ((SV*)class_stash == &PL_sv_undef)) {
+        croak("No stash found");
+    }
+    class_name = HvNAME(class_stash);
+    if (class_name == NULL) {
+        croak("Ooops: Lost object class name");
+    }
+    return class_name;
+}
+
+
+void init(SV* data_hash_ref, SV* attribute_hash_ref) {
     global_hash_ref = (HV*)SvRV(data_hash_ref);
+    global_attribute_of = (HV*)SvRV(attribute_hash_ref);
+
+    global_ref_key.key = newSVpvn("ref", 3);
+    PERL_HASH(global_ref_key.hash, "ref", 3);
+    global_hierarchy_of = newHV();
+}
+
+AV * hierarchy_of(char * class_name) {
+    AV* retval = newAV();
+    dSP;
+    int count;
+    int i;
+
+    ENTER;
+    SAVETMPS;
+
+    PUSHMARK(SP);
+    XPUSHs(sv_2mortal(newSVpv(class_name,0)));
+    PUTBACK;
+
+    count = call_pv("Class::Std::Fast::_hierarchy_of", G_ARRAY);
+
+    SPAGAIN;
+
+    for (i = 1; i <= count; ++i) {
+        av_push(retval, newSVsv(POPs));
+    }
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+    return retval;
+}
+
+void demolish(SV* class_name, unsigned int class_len, SV * object) {
+    //char * demolish_c = malloc(SvCUR(class_name) + 10);
+    char * demolish_c = malloc(class_len + 10);
+    strcpy(demolish_c, SvPV_nolen(class_name));
+    strcat(demolish_c, "::DEMOLISH");
+
+    if (get_cv(demolish_c, 0)) {
+        // printf("DEMOLISH\n");
+        dSP;
+        ENTER;
+        SAVETMPS;
+
+        PUSHMARK(SP);
+        XPUSHs(object);
+        PUTBACK;
+
+        call_pv(demolish_c, G_SCALAR|G_DISCARD);
+
+        SPAGAIN;
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+    free(demolish_c);
+    return;
+}
+
+// TODO: add safety checks...
+void destroy(SV* object) {
+    SV* ident = SvRV(object);
+    char * class_name = get_class(object);
+    unsigned int len = strlen(class_name);
+    unsigned int base_class_len;
+    I32 i = 0;
+    I32 j;
+
+    SV** parent_ref;
+    AV * parent_from;
+    I32 parent_len;
+
+    SV** attr_ref;
+    AV * attr_from;
+    I32 attr_len;
+
+    HE* he;
+
+    SV** attr;
+    SV** base_class;
+
+    //printf("DESTROY\n");
+
+    // if there exists a hierarchy_of entry
+    if (parent_ref = hv_fetch(global_hierarchy_of, class_name, len, 0)) {
+        parent_from = (AV*)SvRV(*parent_ref);
+    }
+    else {
+        // get hierarchy from perl
+        parent_from = hierarchy_of(class_name);
+        // store in hierarchy_of hash
+        //printf("hierarchy of\n");
+        hv_store(global_hierarchy_of, class_name, len, newRV_inc((SV*)parent_from), 0);
+    }
+    {
+        parent_len = av_len(parent_from);
+
+        // for all classes in hierarchy
+        for (; i <= parent_len; ) {
+            // printf("%d\n", i);
+            if (base_class = av_fetch(parent_from, i++,0)) {
+                // call DEMOLISH if exists
+                base_class_len = SvCUR(*base_class);
+                demolish(*base_class, base_class_len, object);
+
+                //if (attr_ref = hv_fetch(global_attribute_of, SvPV_nolen(*base_class), SvCUR(*base_class), 0)) {
+                if (attr_ref = hv_fetch(global_attribute_of, SvPV_nolen(*base_class), base_class_len, 0)) {
+                    if (! SvROK(*attr_ref))
+                        croak("Oops - not a reference");
+                    attr_from = (AV*)SvRV(*attr_ref);
+                    attr_len = av_len(attr_from);
+                    // for all attributes in class
+                    for (j = 0; j <= attr_len;) {
+                        // printf("attr\n");
+                        if (attr = av_fetch(attr_from, j++, 0)) {
+                            if (he = hv_fetch_ent((HV*)SvRV(*attr), global_ref_key.key, 0, global_ref_key.hash)) {
+                                // TODO: check whether he contains a hash ref
+                                if (! SvROK(HeVAL(he)))
+                                    croak("Oops - not a reference");
+                                hv_delete_ent((HV*)SvRV(HeVAL(he)), ident, G_DISCARD, 0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 MODULE = Class::Std::Fast_XS      PACKAGE = Class::Std::Fast_XS
 
-void init(data_hash_ref)
+void destroy(object);
+    SV * object;
+
+void init(data_hash_ref, attribute_hash_ref)
     SV *    data_hash_ref;
+    SV *    attribute_hash_ref;
 
 void
 getter(self)

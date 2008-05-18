@@ -11,7 +11,6 @@ require Class::Std::Fast_XS;
 my %foo_of :ATTR(:name<bla>);
 
 
-
 package main;
 use lib '../lib';
 use lib '../blib/arch';
@@ -25,9 +24,9 @@ eval { TestClass_XS->new() };
 like $@, qr{Missing \s initializer \s label}x;
 
 
+
 my $xs = TestClass_XS->new({ bla => 'foo' });
 is $xs->get_bla(), 'foo';
 
 ok $xs->set_bla('baz');
 is $xs->get_bla(), 'baz';
-

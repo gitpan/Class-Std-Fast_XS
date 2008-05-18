@@ -11,3 +11,4 @@ t/00-use.t
 t/096_characters.t
 t/098_pod.t
 t/099_pod_coverage.t
+Makefile.PL
