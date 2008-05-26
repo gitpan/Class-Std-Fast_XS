@@ -16,16 +16,16 @@ my $compiler_flags =  q{ -I. -O2 -finline-functions -funswitch-loops};
 $compiler_flags .= ($options{debug}) ? q{ -g } : q{};
 
 my $builder = Module::Build->new(
-    module_name         => 'Class::Std::Fast_XS',
-    license             => 'perl',
-    dist_author         => q{Martin Kuter - MKUTTER@cpan.org},
-    dist_version        => 0.2,
-    create_makefile_pl => 'small',
-    extra_linker_flags  => $linker_flags,
-    extra_compiler_flags => $compiler_flags,
-    requires           => {
+    module_name             => 'Class::Std::Fast_XS',
+    dist_version            => 0.3,
+    license                 => 'perl',
+    dist_author             => q{Martin Kutter - MKUTTER@cpan.org},
+    create_makefile_pl      => 'small',
+    extra_linker_flags      => $linker_flags,
+    extra_compiler_flags    => $compiler_flags,
+    requires                => {
         'perl'                    => q(5.8.0),
-        'Class::Std::Fast'        => q(0.0.7),
+        'Class::Std::Fast'        => q(0.0.8),
     }
 );
 

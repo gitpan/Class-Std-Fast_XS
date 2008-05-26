@@ -3,18 +3,26 @@ package Class::Std::Fast_XS;
 use strict;
 use warnings;
 
-our $VESION = 0.2;
-
 use base qw(DynaLoader);
 
+our $VESION = 0.3;
+
+my $do_cache_class_ref;
+
 BEGIN {
-    bootstrap Class::Std::Fast_XS 0.2;
+    bootstrap Class::Std::Fast_XS 0.3;
 
     require Class::Std::Fast;
 
     my $attributes_of_ref = {};
+    $do_cache_class_ref = Class::Std::Fast::_cache_class_ref();
 
-    Class::Std::Fast_XS::init($attributes_of_ref, Class::Std::Fast::_attribute_ref());
+    Class::Std::Fast_XS::init(
+        $attributes_of_ref,
+        Class::Std::Fast::_attribute_ref(),
+        $do_cache_class_ref,
+        Class::Std::Fast::OBJECT_CACHE_REF(),
+    );
 
     no warnings qw(redefine);
 
@@ -31,6 +39,12 @@ BEGIN {
     };
 
     *Class::Std::Fast::DESTROY = \&Class::Std::Fast_XS::destroy;
+}
+
+# clean out do_cache_class hash to avoid creating references
+# during global destruction
+sub END {
+    %{ $do_cache_class_ref } = ();
 }
 
 1;
@@ -111,9 +125,9 @@ Martin Kutter E<lt>martin.kutter fen-net.deE<gt>
 
 =head1 REPOSITORY INFORMATION
 
- $Rev: 583 $
+ $Rev: 468 $
  $LastChangedBy: kutterma $
- $Id: $
- $HeadURL: $
+ $Id: Fast_XS.pm 468 2008-05-21 19:29:31Z kutterma $
+ $HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast_XS/trunk/lib/Class/Std/Fast_XS.pm $
 
 =cut

@@ -16,11 +16,14 @@ HV * global_hash_ref;
 HV * global_hierarchy_of;
 HV * global_attribute_of;
 
+HV* global_do_cache_class_of;
+HV* global_cache_of;
+
 autoxs_hashkey global_ref_key;
 
-char * get_class(SV* obj) {
+char * get_class(SV* obj, HV* class_stash) {
     char * class_name;
-    HV * class_stash = SvSTASH(SvRV(obj));
+    class_stash = SvSTASH(SvRV(obj));
     if ((class_stash == NULL) || ((SV*)class_stash == &PL_sv_undef)) {
         croak("No stash found");
     }
@@ -32,13 +35,18 @@ char * get_class(SV* obj) {
 }
 
 
-void init(SV* data_hash_ref, SV* attribute_hash_ref) {
+void init(SV* data_hash_ref, SV* attribute_hash_ref, SV * do_cache_class_ref, SV* cache_ref) {
     global_hash_ref = (HV*)SvRV(data_hash_ref);
     global_attribute_of = (HV*)SvRV(attribute_hash_ref);
 
     global_ref_key.key = newSVpvn("ref", 3);
     PERL_HASH(global_ref_key.hash, "ref", 3);
+
     global_hierarchy_of = newHV();
+
+    global_do_cache_class_of = (HV*)SvRV(do_cache_class_ref);
+    global_cache_of = (HV*)SvRV(cache_ref);
+
 }
 
 AV * hierarchy_of(char * class_name) {
@@ -69,8 +77,8 @@ AV * hierarchy_of(char * class_name) {
 }
 
 void demolish(SV* class_name, unsigned int class_len, SV * object) {
-    //char * demolish_c = malloc(SvCUR(class_name) + 10);
-    char * demolish_c = malloc(class_len + 10);
+    //char * demolish_c = malloc(SvCUR(class_name) + 11);
+    char * demolish_c = malloc(class_len + 11);
     strcpy(demolish_c, SvPV_nolen(class_name));
     strcat(demolish_c, "::DEMOLISH");
 
@@ -95,11 +103,31 @@ void demolish(SV* class_name, unsigned int class_len, SV * object) {
     return;
 }
 
+void cache_store (SV* object, char* class_name, unsigned int len, HV* class_stash) {
+    SV** pool_ref;
+    AV* pool;
+
+    if (pool_ref = hv_fetch(global_cache_of, class_name, len, 0)) {
+        pool = (AV*)SvRV(*pool_ref);
+    }
+    else {
+        pool = newAV();
+        hv_store(global_cache_of, class_name, len, newRV_inc((SV*)pool), 0);
+    }
+
+    sv_bless(object, class_stash);
+    SvREFCNT_inc(object);
+    av_push(pool, object);
+}
+
 // TODO: add safety checks...
 void destroy(SV* object) {
     SV* ident = SvRV(object);
-    char * class_name = get_class(object);
-    unsigned int len = strlen(class_name);
+    HV* class_stash;
+
+    // class_stash is returned via parameter list
+    char * class_name; // = get_class(object, class_stash);
+    unsigned int len;
     unsigned int base_class_len;
     I32 i = 0;
     I32 j;
@@ -117,7 +145,17 @@ void destroy(SV* object) {
     SV** attr;
     SV** base_class;
 
-    //printf("DESTROY\n");
+    SV** cache_ref;
+
+    class_stash = SvSTASH(SvRV(object));
+    if ((class_stash == NULL) || ((SV*)class_stash == &PL_sv_undef)) {
+        croak("No stash found");
+    }
+    class_name = HvNAME(class_stash);
+    if (class_name == NULL) {
+        croak("Ooops: Lost object class name");
+    }
+    len = strlen(class_name);
 
     // if there exists a hierarchy_of entry
     if (parent_ref = hv_fetch(global_hierarchy_of, class_name, len, 0)) {
@@ -162,6 +200,9 @@ void destroy(SV* object) {
                 }
             }
         }
+        if (hv_exists(global_do_cache_class_of, class_name, len)) {
+            cache_store(object, class_name, len, class_stash);
+        }
     }
 }
 
@@ -170,9 +211,11 @@ MODULE = Class::Std::Fast_XS      PACKAGE = Class::Std::Fast_XS
 void destroy(object);
     SV * object;
 
-void init(data_hash_ref, attribute_hash_ref)
-    SV *    data_hash_ref;
-    SV *    attribute_hash_ref;
+void init(data_hash_ref, attribute_hash_ref, do_cache_class_ref, cache_ref)
+    SV*     data_hash_ref;
+    SV*     attribute_hash_ref;
+    SV*     do_cache_class_ref;
+    SV*     cache_ref;
 
 void
 getter(self)

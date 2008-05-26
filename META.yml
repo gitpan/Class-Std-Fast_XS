@@ -1,14 +1,14 @@
 ---
 name: Class-Std-Fast_XS
-version: 0.2
+version: 0.3
 author:
-  - 'Martin Kuter - MKUTTER@cpan.org'
+  - 'Martin Kutter - MKUTTER@cpan.org'
 abstract: speed up Class::Std::Fast by adding some XS code
 license: perl
 resources:
   license: http://dev.perl.org/licenses/
 requires:
-  Class::Std::Fast: 0.0.7
+  Class::Std::Fast: 0.0.8
   perl: 5.8.0
 provides:
   Class::Std::Fast_XS:
